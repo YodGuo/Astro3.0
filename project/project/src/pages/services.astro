@@ -1,0 +1,70 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+
+export const prerender = true;
+
+// Load build-data for prerendered branding
+let buildData: { settings: Record<string, string>; pages?: Record<string, Record<string, Record<string, string>>> } = { settings: {} };
+try {
+  const { default: data } = await import('../data/build-data.json');
+  if (data) buildData = data;
+} catch { /* build-data.json not generated yet */ }
+
+const servicesHero = buildData.pages?.services?.hero || {};
+const servicesPages = buildData.pages?.services || {};
+
+// Collect all item_* sections and sort by extracting number from section name
+const serviceItems = Object.entries(servicesPages)
+  .filter(([key]) => key.startsWith('item_'))
+  .sort(([a], [b]) => {
+    const numA = parseInt(a.replace('item_', ''));
+    const numB = parseInt(b.replace('item_', ''));
+    return numA - numB;
+  })
+  .map(([, fields]) => ({
+    title: fields.title || '',
+    desc: fields.desc || '',
+  }))
+  .filter(item => item.title);
+
+// Fallback to original hardcoded array if no dynamic items
+const FALLBACK_SERVICES = [
+  { title: 'Power Assessment', desc: 'Comprehensive analysis of your power needs and infrastructure requirements.' },
+  { title: 'System Design', desc: 'Custom-engineered UPS and power distribution systems for your facility.' },
+  { title: 'Installation', desc: 'Professional installation by certified technicians with minimal downtime.' },
+  { title: 'Maintenance & Support', desc: '24/7 monitoring, preventive maintenance, and rapid response service.' },
+];
+
+const SERVICES = serviceItems.length > 0 ? serviceItems : FALLBACK_SERVICES;
+---
+
+<BaseLayout title="Services" buildData={buildData}>
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Our Services",
+    "description": "Professional B2B power services — installation, maintenance, monitoring, and custom power solutions for critical infrastructure.",
+    "url": Astro.url.href,
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": new URL("/", Astro.url).href },
+        { "@type": "ListItem", "position": 2, "name": "Services", "item": Astro.url.href }
+      ]
+    }
+  })} />
+  <section style="padding: 4rem 0;">
+    <div class="container" style="max-width: 48rem;">
+      <h1 class="heading-1" style="margin-bottom: 1rem;">{servicesHero.title || 'Our Services'}</h1>
+      <p style="color: var(--color-text-secondary); margin-bottom: 3rem; font-size: 1.0625rem;">{servicesHero.subtitle || 'End-to-end power continuity solutions from assessment to ongoing support.'}</p>
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        {SERVICES.map((s) => (
+          <div class="card">
+            <h3 class="heading-3" style="margin-bottom: 0.5rem;">{s.title}</h3>
+            <p style="color: var(--color-text-secondary); font-size: 0.9375rem;">{s.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>

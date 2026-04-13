@@ -1,0 +1,454 @@
+---
+import '../styles/global.css'
+import darkModeCssRaw from '../styles/dark-mode.css?raw';
+import { getD1, batchGetSettings } from '../lib/page-visibility'
+import { getEnv } from '../lib/env'
+import { createHash } from 'node:crypto'
+import { optimizeImage, IMAGE_PRESETS } from '../lib/image-optimize'
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+  ogType?: "website" | "article";
+  articleMeta?: {
+    publishedTime?: string;
+    author?: string;
+    tags?: string[];
+  };
+  /** When provided, use buildData settings instead of D1/KV (prerender mode). */
+  buildData?: { settings: Record<string, string>; pages?: Record<string, Record<string, Record<string, string>>> } | null;
+  /** If true, add <meta name="robots" content="noindex"> to prevent indexing. */
+  noIndex?: boolean;
+}
+
+const { title, description, ogImage, ogType = "website", articleMeta, buildData, noIndex } = Astro.props;
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || 'https://yourcompany.com';
+
+// Dual-track settings: prerender pages pass buildData, SSR pages read from D1/KV
+let settings = new Map<string, string>();
+
+if (buildData && buildData.settings && Object.keys(buildData.settings).length > 0) {
+  // Prerender mode: read from buildData
+  settings = new Map(Object.entries(buildData.settings));
+} else {
+  // SSR mode: read from D1/KV
+  const d1 = await getD1();
+  const env = await getEnv();
+  const allKeys = [
+    'social_links',
+    'products_enabled', 'solutions_enabled', 'services_enabled', 'news_enabled', 'about_enabled',
+    'privacy_enabled', 'terms_enabled',
+    'site_name', 'site_description', 'site_logo_url', 'site_favicon_url', 'site_og_image_url',
+    'ga_measurement_id',
+  ];
+  settings = await batchGetSettings(d1, allKeys, env.SETTINGS_CACHE);
+}
+
+// Branding settings (with safe defaults)
+const siteName = settings.get('site_name') || 'YourCompany';
+const siteDescription = settings.get('site_description') || 'Professional B2B power solutions — UPS systems, PDUs, and power distribution products.';
+const siteLogoUrl = settings.get('site_logo_url') || '';
+const siteFaviconUrl = settings.get('site_favicon_url') || '/favicon.svg';
+const siteOgImageUrl = settings.get('site_og_image_url') || '';
+const darkModeEnabled = settings.get('dark_mode_enabled') === 'true' || settings.get('dark_mode_enabled') === true;
+const darkModeCss = darkModeEnabled ? darkModeCssRaw : '';
+
+// GA tracking
+const gaId = buildData?.settings?.ga_measurement_id || settings.get('ga_measurement_id') || '';
+const privacyEnabled = buildData?.settings?.privacy_enabled || settings.get('privacy_enabled') || 'true';
+const termsEnabled = buildData?.settings?.terms_enabled || settings.get('terms_enabled') || 'true';
+
+// CSP script hashes for inline scripts (computed at build time)
+const DARK_MODE_SCRIPT_HASH = 'sha256-M2ZSmr5LG1uJ6pVKG4w+MZqkgWk7HQJnSJJE10ky6YM=';
+let gtmScriptHash = '';
+if (gaId) {
+  const gtmScript = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}');`;
+  gtmScriptHash = 'sha256-' + createHash('sha256').update(gtmScript).digest('base64');
+}
+// Build CSP script-src value
+const cspScriptSrc = gaId
+  ? `'self' '${DARK_MODE_SCRIPT_HASH}' '${gtmScriptHash}' https://www.googletagmanager.com`
+  : `'self' '${DARK_MODE_SCRIPT_HASH}' https://www.googletagmanager.com`;
+
+// Derived values (page props override site defaults)
+const pageTitle = title ? `${title} — ${siteName}` : `${siteName} — Uninterruptible Power Solutions`;
+const pageDescription = description || siteDescription;
+const pageOgImage = ogImage || (siteOgImageUrl ? `${siteUrl}${siteOgImageUrl}` : `${siteUrl}/og-default.png`);
+const faviconType = siteFaviconUrl.endsWith('.svg') ? 'image/svg+xml' : siteFaviconUrl.endsWith('.ico') ? 'image/x-icon' : 'image/png';
+
+// Load social links for Organization schema
+let socialLinks: string[] = [];
+try {
+  const raw = settings.get('social_links');
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) socialLinks = parsed.filter((url: string) => typeof url === 'string' && url.startsWith('http'));
+  }
+} catch { /* ignore */ }
+
+const NAV_LINKS = [
+  { href: '/products', label: 'Products', settingKey: 'products_enabled' },
+  { href: '/solutions/data-centers', label: 'Solutions', settingKey: 'solutions_enabled' },
+  { href: '/services', label: 'Services', settingKey: 'services_enabled' },
+  { href: '/news', label: 'News', settingKey: 'news_enabled' },
+  { href: '/about', label: 'About', settingKey: 'about_enabled' },
+];
+
+const visibleLinks = NAV_LINKS.filter(
+  (link) => { const v = settings.get(link.settingKey); return v === undefined || v === 'true'; }
+);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type={faviconType} href={siteFaviconUrl} />
+    <!-- Google Fonts: preconnect + preload + non-blocking stylesheet (P-02: optimized for LCP) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" />
+    </noscript>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {darkModeCss && <style is:global set:html={darkModeCss} />}
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDescription} />
+    <!-- Open Graph -->
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={Astro.url.href} />
+    <link rel="canonical" href={Astro.url.href} />
+    {noIndex && <meta name="robots" content="noindex, nofollow" />}
+    <meta property="og:image" content={pageOgImage} />
+    <meta property="og:site_name" content={siteName} />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={pageDescription} />
+    <meta name="twitter:image" content={pageOgImage} />
+{articleMeta && (
+  <>
+    {articleMeta.publishedTime && <meta property="article:published_time" content={articleMeta.publishedTime} />}
+    {articleMeta.author && <meta property="article:author" content={articleMeta.author} />}
+    {articleMeta.tags?.map((tag) => <meta property="article:tag" content={tag} />)}
+  </>
+)}
+    <!-- Organization Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": siteName,
+      "url": siteUrl,
+      "logo": siteLogoUrl ? `${siteUrl}${siteLogoUrl}` : `${siteUrl}/logo.png`,
+      "description": siteDescription,
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "sales",
+        "availableLanguage": ["English", "Chinese"]
+      },
+      "sameAs": socialLinks
+    })} />
+    {gaId && (
+      <>
+        <script set:html={`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}');`} />
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
+      </>
+    )}
+    {/* CSP for prerendered pages (middleware is skipped for prerendered).
+        script-src uses SHA-256 hashes for inline scripts (dark mode toggle, GTM init) instead of 'unsafe-inline'.
+        style-src retains 'unsafe-inline' (374 inline styles across 39 files — tracked for future removal).
+        When middleware sets CSP via HTTP header, this <meta> tag is ignored by browsers. */}
+    <meta http-equiv="content-security-policy" content={`default-src 'self'; script-src ${cspScriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob: https://www.google-analytics.com; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com; frame-ancestors 'none';`} />
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <header class="site-header">
+      <div class="container">
+        <a href="/" class="logo">
+          {siteLogoUrl ? <img src={optimizeImage(siteLogoUrl, IMAGE_PRESETS.logo)} alt={siteName} class="logo-img" /> : siteName}
+        </a>
+        <button class="menu-toggle" id="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
+          <span class="menu-bar"></span>
+          <span class="menu-bar"></span>
+          <span class="menu-bar"></span>
+        </button>
+        <nav class="nav" id="main-nav">
+          {visibleLinks.map((link) => (
+            <a href={link.href} class="nav-link">{link.label}</a>
+          ))}
+          {darkModeEnabled && (
+          <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+            <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+          )}
+        </nav>
+      </div>
+    </header>
+    <main id="main-content">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="container">
+        <p style="font-size: 0.875rem; color: var(--color-text-tertiary);">© {new Date().getFullYear()} {siteName}. All rights reserved.
+          {privacyEnabled !== 'false' && <a href="/privacy" style="color: var(--color-text-secondary); margin-left: 1rem;">Privacy Policy</a>}
+          {termsEnabled !== 'false' && <a href="/terms" style="color: var(--color-text-secondary); margin-left: 1rem;">Terms & Conditions</a>}
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<script>
+const toggle = document.getElementById('menu-toggle');
+const nav = document.getElementById('main-nav');
+
+toggle?.addEventListener('click', () => {
+  const expanded = toggle.getAttribute('aria-expanded') === 'true';
+  toggle.setAttribute('aria-expanded', String(!expanded));
+  nav?.classList.toggle('nav-open');
+  toggle.classList.toggle('menu-toggle-active');
+});
+
+// Close menu when clicking a nav link (mobile)
+nav?.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', () => {
+    toggle?.setAttribute('aria-expanded', 'false');
+    nav?.classList.remove('nav-open');
+    toggle?.classList.remove('menu-toggle-active');
+  });
+});
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (!toggle?.contains(e.target as Node) && !nav?.contains(e.target as Node)) {
+    toggle?.setAttribute('aria-expanded', 'false');
+    nav?.classList.remove('nav-open');
+    toggle?.classList.remove('menu-toggle-active');
+  }
+});
+</script>
+{darkModeEnabled && <script is:inline>
+// ── Dark mode toggle ──
+(function initThemeToggle() {
+  const btn = document.getElementById('theme-toggle');
+  const sunIcon = document.getElementById('theme-icon-sun');
+  const moonIcon = document.getElementById('theme-icon-moon');
+  if (!btn || !sunIcon || !moonIcon) return;
+
+  const STORAGE_KEY = 'theme';
+
+  function getStoredTheme() {
+    return localStorage.getItem(STORAGE_KEY) || 'system';
+  }
+
+  function isDark() {
+    const theme = getStoredTheme();
+    if (theme === 'dark') return true;
+    if (theme === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function applyTheme() {
+    const dark = isDark();
+    document.documentElement.classList.toggle('dark', dark);
+    sunIcon.style.display = dark ? 'block' : 'none';
+    moonIcon.style.display = dark ? 'none' : 'block';
+  }
+
+  btn.addEventListener('click', () => {
+    const current = getStoredTheme();
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, next);
+    applyTheme();
+  });
+
+  // Apply on load (before paint to avoid flash)
+  applyTheme();
+
+  // Listen for system preference changes when in 'system' mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (getStoredTheme() === 'system') applyTheme();
+  });
+})();
+</script>}
+
+<style>
+  .container { max-width: 72rem; margin: 0 auto; padding: 0 var(--spacing-6); }
+  .site-header { 
+    border-bottom: 1px solid var(--color-border-subtle); 
+    background: rgba(255, 255, 255, 0.85); 
+    backdrop-filter: blur(12px);
+    position: sticky; 
+    top: 0; 
+    z-index: 50; 
+    box-shadow: var(--shadow-xs);
+    transition: box-shadow var(--transition-normal);
+  }
+  .site-header:hover {
+    box-shadow: var(--shadow-sm);
+  }
+  .site-header .container { display: flex; align-items: center; justify-content: space-between; height: var(--spacing-16); }
+  .logo { 
+    font-size: var(--font-size-lg); 
+    font-weight: var(--font-weight-bold); 
+    color: var(--color-text-primary); 
+    text-decoration: none; 
+    display: flex; 
+    align-items: center; 
+    gap: var(--spacing-2); 
+    transition: opacity var(--transition-fast);
+  }
+  .logo:hover { opacity: 0.8; }
+  .logo-img { height: 1.75rem; width: auto; object-fit: contain; }
+  .nav { display: flex; align-items: center; gap: var(--spacing-8); }
+  .nav-link { 
+    font-size: var(--font-size-sm); 
+    color: var(--color-text-secondary); 
+    text-decoration: none;
+    font-weight: var(--font-weight-medium);
+    position: relative;
+    padding: var(--spacing-2) 0;
+    transition: color var(--transition-fast);
+  }
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--color-brand-600);
+    transition: width var(--transition-normal);
+    border-radius: var(--radius-full);
+  }
+  .nav-link:hover { 
+    color: var(--color-text-primary); 
+  }
+  .nav-link:hover::after {
+    width: 100%;
+  }
+  .site-footer { 
+    border-top: 1px solid var(--color-border-subtle); 
+    padding: var(--spacing-8) 0; 
+    margin-top: var(--spacing-16); 
+  }
+
+  /* ── Hamburger Button ── */
+  .menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--spacing-1-5);
+    width: var(--spacing-9);
+    height: var(--spacing-9);
+    padding: var(--spacing-1-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .menu-toggle:hover {
+    background: var(--color-surface-subtle);
+    border-color: var(--color-gray-300);
+  }
+  .menu-bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--color-text-secondary);
+    border-radius: var(--radius-full);
+    transition: transform var(--transition-fast), opacity var(--transition-fast);
+  }
+  .menu-toggle-active .menu-bar:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .menu-toggle-active .menu-bar:nth-child(2) { opacity: 0; }
+  .menu-toggle-active .menu-bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  /* ── Mobile Navigation ── */
+  @media (max-width: 768px) {
+    .menu-toggle { display: flex; }
+
+    .nav {
+      display: flex;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border-subtle);
+      box-shadow: var(--shadow-lg);
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: max-height var(--transition-normal), opacity var(--transition-normal), transform var(--transition-normal);
+    }
+    .nav.nav-open { 
+      max-height: 500px;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .nav-link {
+      display: block;
+      padding: var(--spacing-4) var(--spacing-6);
+      border-bottom: 1px solid var(--color-border-subtle);
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-primary);
+      transition: background var(--transition-fast), padding-left var(--transition-fast);
+    }
+    .nav-link::after {
+      display: none;
+    }
+    .nav-link:hover {
+      background: var(--color-surface-subtle);
+      padding-left: var(--spacing-7);
+    }
+    .nav-link:last-child { border-bottom: none; }
+  }
+
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-9);
+    height: var(--spacing-9);
+    padding: var(--spacing-1-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover {
+    color: var(--color-text-primary);
+    background: var(--color-surface-subtle);
+    border-color: var(--color-gray-300);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+  .theme-toggle:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  @media (max-width: 768px) {
+    .theme-toggle {
+      display: flex;
+      margin: var(--spacing-3) var(--spacing-6) var(--spacing-4);
+      align-self: flex-start;
+    }
+  }
+</style>

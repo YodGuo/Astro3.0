@@ -1,0 +1,170 @@
+---
+/**
+ * DomainIsolationSection — Admin UI for configuring dual-domain isolation.
+ * When both public_domain and admin_domain are set, the middleware enforces:
+ *   - Public domain: blocks /admin/* and /api/* (returns 404)
+ *   - Admin domain: redirects public pages to public domain (301)
+ * When either is empty, domain isolation is disabled (no enforcement).
+ */
+
+interface Props {
+  settings: Record<string, string>;
+}
+
+const { settings } = Astro.props;
+
+const publicDomain = settings.public_domain || '';
+const adminDomain = settings.admin_domain || '';
+---
+
+<div style="margin-bottom: 2rem;">
+  <h2 style="font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary); margin-bottom: 0.75rem;">Domain Isolation</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+    <p style="font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.5;">
+      Separate your public website and admin panel onto different domains.
+      When both fields are configured, the middleware will block admin routes on the public domain
+      and redirect public pages on the admin domain.
+      Leave empty to disable domain isolation.
+    </p>
+
+    <!-- Public Domain -->
+    <div>
+      <label for="domain-public" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Public Domain</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">
+        The domain visitors use to browse your website (e.g. <code>yourcompany.com</code>).
+        Admin and API routes will return 404 on this domain.
+      </p>
+      <input id="domain-public" type="text" value={publicDomain} maxlength="200" placeholder="yourcompany.com"
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box;" />
+    </div>
+
+    <!-- Admin Domain -->
+    <div>
+      <label for="domain-admin" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Admin Domain</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">
+        The domain for the admin panel (e.g. <code>admin.yourcompany.com</code>).
+        Public pages will redirect to the public domain.
+      </p>
+      <input id="domain-admin" type="text" value={adminDomain} maxlength="200" placeholder="admin.yourcompany.com"
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box;" />
+    </div>
+
+    <!-- Current Status -->
+    <div id="domain-status-display" style="padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.8125rem; line-height: 1.5;">
+      {publicDomain && adminDomain && publicDomain !== adminDomain ? (
+        <div style="background: var(--color-success-bg); color: var(--color-brand-800); border: 1px solid var(--color-success-border);">
+          ✓ Domain isolation is <strong>active</strong>. Public: <code>{publicDomain}</code> → Admin: <code>{adminDomain}</code>
+        </div>
+      ) : (
+        <div style="background: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">
+          ⚠ Domain isolation is <strong>disabled</strong>. {(!publicDomain && !adminDomain) ? 'Configure both domains below to enable.' : 'Both domains must be set and different to enable.'}
+        </div>
+      )}
+    </div>
+
+    <!-- Save Button -->
+    <div style="display: flex; justify-content: flex-end; padding-top: 0.5rem; border-top: 1px solid var(--color-border);">
+      <button id="domain-save-btn" type="button" class="btn-secondary" onclick="saveDomainSettings(this)">
+        Save Domains
+      </button>
+    </div>
+
+    <!-- Status message -->
+    <div id="domain-status" style="font-size: 0.8125rem; display: none;"></div>
+
+  </div>
+</div>
+
+<script>
+const DOMAIN_FIELDS = [
+  { id: 'domain-public', key: 'public_domain' },
+  { id: 'domain-admin', key: 'admin_domain' },
+];
+
+async function saveDomainSettings(btn: HTMLButtonElement) {
+  const statusEl = document.getElementById('domain-status');
+  const statusDisplay = document.getElementById('domain-status-display');
+  const originalText = btn.textContent;
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  if (statusEl) { statusEl.style.display = 'none'; }
+
+  let hasError = false;
+
+  for (const field of DOMAIN_FIELDS) {
+    const input = document.getElementById(field.id) as HTMLInputElement | null;
+    if (!input) continue;
+
+    // Normalize: strip protocol and trailing slash
+    let value = input.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    input.value = value;
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: field.key, value }),
+      });
+      if (!res.ok) {
+        hasError = true;
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as Record<string, unknown>).error instanceof Error ? (data.error as Error).message : typeof (data as Record<string, unknown>).error === 'string' ? (data as Record<string, unknown>).error as string : '' || `Failed to save ${field.key}`);
+      }
+    } catch (e) {
+      hasError = true;
+      if (statusEl) {
+        statusEl.textContent = `Error: ${(e as Error).message}`;
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--color-danger)';
+      }
+      break;
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = hasError ? 'Retry' : 'Saved ✓';
+
+  if (!hasError && statusEl) {
+    statusEl.textContent = 'Domain settings saved. Isolation will take effect immediately (middleware reads from KV cache).';
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--color-brand-800)';
+
+    // Update status display
+    if (statusDisplay) {
+      const pubInput = document.getElementById('domain-public') as HTMLInputElement | null;
+      const admInput = document.getElementById('domain-admin') as HTMLInputElement | null;
+      const pub = pubInput?.value.trim() || '';
+      const adm = admInput?.value.trim() || '';
+      if (pub && adm && pub !== adm) {
+        // Build DOM safely to avoid XSS from user-controlled domain values
+        const div = document.createElement('div');
+        div.style.cssText = 'background: var(--color-success-bg); color: var(--color-brand-800); border: 1px solid var(--color-success-border);';
+        div.textContent = '';
+        const strong = document.createElement('strong');
+        strong.textContent = '✓ Domain isolation is active. ';
+        div.appendChild(strong);
+        const pubCode = document.createElement('code');
+        pubCode.textContent = pub;
+        div.appendChild(pubCode);
+        const arrow = document.createTextNode(' → ');
+        div.appendChild(arrow);
+        const admCode = document.createElement('code');
+        admCode.textContent = adm;
+        div.appendChild(admCode);
+        statusDisplay.innerHTML = '';
+        statusDisplay.appendChild(div);
+      } else {
+        statusDisplay.innerHTML = `<div style="background: var(--color-warning-bg); color: var(--color-warning-text); border: 1px solid var(--color-warning-border);">⚠ Domain isolation is <strong>disabled</strong>. Both domains must be set and different to enable.</div>`;
+      }
+    }
+  }
+
+  if (!hasError) {
+    setTimeout(() => { btn.textContent = originalText || 'Save Domains'; }, 2000);
+  }
+}
+
+(window as any).saveDomainSettings // eslint-disable-line @typescript-eslint/no-explicit-any = saveDomainSettings;
+</script>

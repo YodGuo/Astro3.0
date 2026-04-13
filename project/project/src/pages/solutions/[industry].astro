@@ -1,0 +1,103 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { sanitizeHtml } from '../../lib/sanitize'
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  const validIndustries = ['data-centers', 'healthcare', 'industrial', 'telecommunications', 'finance', 'government'];
+  return validIndustries.map((industry) => ({
+    params: { industry },
+  }));
+}
+
+const { industry } = Astro.params;
+
+// Validate industry parameter
+const validIndustries = ['data-centers', 'healthcare', 'industrial', 'telecommunications', 'finance', 'government'];
+if (!industry || !validIndustries.includes(industry)) {
+  return Astro.redirect('/404');
+}
+
+const title = industry.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+// Load from build-data (primary data source for static prerender)
+let buildData: { settings: Record<string, string>; solutions?: Array<{ id: string; slug: string; industry: string; title: string; content: string | null }> } = { settings: {} };
+try {
+  const { default: data } = await import('../../data/build-data.json');
+  if (data) buildData = data;
+} catch { /* build-data.json not generated yet */ }
+
+const siteName = buildData.settings.site_name || 'YourCompany';
+
+// Find matching solution from build-data
+const solution = buildData.solutions?.find(s => s.industry === industry) || null;
+const displayTitle = solution?.title || `${title} Solutions`;
+
+// FAQ data for structured data
+const faqItems = [
+  {
+    question: `What power challenges does the ${title.toLowerCase()} industry face?`,
+    answer: solution?.content
+      ? `Our ${displayTitle} address continuous power requirements, compliance with industry regulations, minimizing downtime, and scalability for growing infrastructure.`
+      : `The ${title.toLowerCase()} industry faces continuous power requirements for critical operations, compliance with industry regulations and standards, minimizing downtime and ensuring business continuity, and scalability for growing infrastructure needs.`
+  },
+  {
+    question: `What solutions does ${siteName} offer for ${title.toLowerCase()}?`,
+    answer: solution?.content
+      ? `We provide tailored power continuity solutions including high-availability UPS systems, custom power distribution, 24/7 remote monitoring, and preventive maintenance programs.`
+      : `Our solutions include high-availability UPS systems with N+1 redundancy, custom power distribution architecture, 24/7 remote monitoring and alerting, and preventive maintenance programs.`
+  },
+  {
+    question: `How can I get a custom solution for my ${title.toLowerCase()} facility?`,
+    answer: `Contact our team through the quote request form or reach out directly. We provide free consultations and custom power assessments for ${title.toLowerCase()} facilities.`
+  }
+];
+---
+
+<BaseLayout title={displayTitle} buildData={buildData}>
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqItems.map(item => ({
+      "@type": "Question",
+      "name": item.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": item.answer
+      }
+    }))
+  })} />
+  <section style="padding: 4rem 0;">
+    <div class="container" style="max-width: 48rem;">
+      <h1 class="heading-1" style="margin-bottom: 1rem;">{displayTitle}</h1>
+      {solution && solution.content ? (
+        <div class="card" style="margin-bottom: 2rem;">
+          <div set:html={sanitizeHtml(solution.content || '')} />
+        </div>
+      ) : (
+        <>
+          <p style="color: var(--color-text-secondary); margin-bottom: 2rem; line-height: 1.8;">Tailored power continuity solutions designed for the unique challenges of the {title.toLowerCase()} industry.</p>
+          <div class="card" style="margin-bottom: 2rem;">
+            <h2 class="heading-2" style="margin-bottom: 1rem;">Challenges</h2>
+            <ul style="color: var(--color-text-secondary); padding-left: 1.25rem; line-height: 2;">
+              <li>Continuous power requirements for critical operations</li>
+              <li>Compliance with industry regulations and standards</li>
+              <li>Minimizing downtime and ensuring business continuity</li>
+              <li>Scalability for growing infrastructure needs</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h2 class="heading-2" style="margin-bottom: 1rem;">Our Solutions</h2>
+            <ul style="color: var(--color-text-secondary); padding-left: 1.25rem; line-height: 2;">
+              <li>High-availability UPS systems with N+1 redundancy</li>
+              <li>Custom power distribution architecture</li>
+              <li>24/7 remote monitoring and alerting</li>
+              <li>Preventive maintenance programs</li>
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  </section>
+</BaseLayout>

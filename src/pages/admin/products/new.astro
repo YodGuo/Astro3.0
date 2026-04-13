@@ -1,0 +1,13 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import ProductForm from '../../../components/admin/ProductForm.tsx'
+
+export const prerender = false;
+---
+
+<AdminLayout title="New Product — Admin" currentPath="/admin/products">
+  <div>
+    <h1 class="heading-1" style="margin-bottom: 1.5rem;">New Product</h1>
+    <ProductForm client:load mode="create" />
+  </div>
+</AdminLayout>
