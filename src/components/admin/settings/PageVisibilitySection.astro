@@ -52,5 +52,6 @@ function toggleSetting(checkbox: HTMLInputElement) {
     });
   } catch { alert('Network error'); checkbox.checked = !value; }
 }
+
 (window as any).toggleSetting = toggleSetting;
 </script>
