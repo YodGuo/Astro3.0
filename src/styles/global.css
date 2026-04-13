@@ -1,5 +1,8 @@
 /* Google Fonts loaded via <link> in BaseLayout.astro for performance (P-02) */
 
+/* ── Theme Overrides ── */
+@import './theme-overrides.css';
+
 :root {
   /* ── Color System (50-950) ── */
   --color-brand-50: #ecfdf5;
@@ -453,6 +456,3 @@ a:hover { text-decoration: underline; color: var(--color-brand-700); }
 .animate-duration-slow {
   animation-duration: 500ms;
 }
-
-/* ── Theme Overrides ── */
-@import './theme-overrides.css';

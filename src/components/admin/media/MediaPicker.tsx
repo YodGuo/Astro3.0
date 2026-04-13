@@ -58,7 +58,7 @@ export default function MediaPicker({ open, onClose, onSelect }: MediaPickerProp
       setInitialLoading(true);
       fetchItems(null, "", false);
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, fetchItems]);
 
   // Search with debounce
   const handleSearch = (value: string) => {

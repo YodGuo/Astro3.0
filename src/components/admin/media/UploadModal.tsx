@@ -127,7 +127,6 @@ const progressBarBgStyle: React.CSSProperties = {
 export default function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [queue, setQueue] = useState<UploadEntry[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isProcessingRef = useRef(false);
 
@@ -136,7 +135,6 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
     if (!open) {
       setQueue([]);
       setDragOver(false);
-      setProcessing(false);
       isProcessingRef.current = false;
     }
   }, [open]);
@@ -216,7 +214,6 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
   const processQueue = useCallback(async () => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
-    setProcessing(true);
 
     // Find the first WAITING entry
     let idx = -1;
@@ -266,7 +263,6 @@ export default function UploadModal({ open, onClose, onUploaded }: UploadModalPr
     }
 
     isProcessingRef.current = false;
-    setProcessing(false);
 
     // Check if all done
     setQueue((prev) => {

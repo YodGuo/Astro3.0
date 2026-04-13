@@ -81,7 +81,12 @@ async function saveAnalyticsSettings(btn: HTMLButtonElement) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error((data as Record<string, unknown>).error instanceof Error ? (data.error as Error).message : typeof (data as Record<string, unknown>).error === 'string' ? (data as Record<string, unknown>).error as string : '' || 'Failed to save analytics settings');
+      const errorMessage = (data as Record<string, unknown>).error instanceof Error 
+        ? (data.error as Error).message 
+        : typeof (data as Record<string, unknown>).error === 'string' 
+        ? (data as Record<string, unknown>).error as string 
+        : 'Failed to save analytics settings';
+      throw new Error(errorMessage);
     }
 
     btn.disabled = false;
@@ -106,5 +111,5 @@ async function saveAnalyticsSettings(btn: HTMLButtonElement) {
   }
 }
 
-(window as any).saveAnalyticsSettings // eslint-disable-line @typescript-eslint/no-explicit-any = saveAnalyticsSettings;
+(window as any).saveAnalyticsSettings = saveAnalyticsSettings;
 </script>
