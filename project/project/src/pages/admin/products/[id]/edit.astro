@@ -1,0 +1,15 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro'
+import ProductForm from '../../../../components/admin/ProductForm.tsx'
+
+export const prerender = false;
+
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Edit Product — Admin" currentPath="/admin/products">
+  <div>
+    <h1 class="heading-1" style="margin-bottom: 1.5rem;">Edit Product</h1>
+    <ProductForm client:load mode="edit" productId={id} />
+  </div>
+</AdminLayout>

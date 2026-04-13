@@ -1,0 +1,56 @@
+---
+interface SettingItem {
+  key: string;
+  label: string;
+  description: string;
+}
+
+interface SettingGroup {
+  title: string;
+  items: SettingItem[];
+}
+
+interface Props {
+  settings: Record<string, boolean>;
+  settingGroups: SettingGroup[];
+}
+
+const { settings, settingGroups } = Astro.props;
+---
+
+{settingGroups.map((group) => (
+  <div style="margin-bottom: 2rem;">
+    <h2 style="font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary); margin-bottom: 0.75rem;">{group.title}</h2>
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {group.items.map((s) => (
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-weight: 500; margin-bottom: 0.125rem;">{s.label}</h3>
+            <p style="font-size: 0.8125rem; color: var(--color-text-tertiary);">{s.description}</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" data-key={s.key} checked={settings[s.key] !== false} onchange="toggleSetting(this)" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      ))}
+    </div>
+  </div>
+))}
+
+<script>
+function toggleSetting(checkbox: HTMLInputElement) {
+  const key = checkbox.dataset.key;
+  const value = checkbox.checked;
+  try {
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    }).then((res) => {
+      if (!res.ok) { alert('Failed to save setting'); checkbox.checked = !value; }
+    });
+  } catch { alert('Network error'); checkbox.checked = !value; }
+}
+(window as any).toggleSetting // eslint-disable-line @typescript-eslint/no-explicit-any = toggleSetting;
+</script>

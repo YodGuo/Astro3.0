@@ -1,0 +1,13 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro'
+import LazyNewsForm from '../../../components/admin/LazyNewsForm.tsx'
+
+export const prerender = false;
+---
+
+<AdminLayout title="New Article — Admin" currentPath="/admin/news">
+  <div>
+    <h1 class="heading-1" style="margin-bottom: 1.5rem;">New Article</h1>
+    <LazyNewsForm client:only="react" mode="create" />
+  </div>
+</AdminLayout>

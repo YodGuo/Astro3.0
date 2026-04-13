@@ -1,0 +1,69 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+
+export const prerender = true;
+
+// Load build-data for prerendered branding (fail-open: empty when file absent)
+let buildData: { settings: Record<string, string>; pages?: Record<string, Record<string, Record<string, string>>> } = { settings: {} };
+try {
+  const { default: data } = await import('../data/build-data.json');
+  if (data) buildData = data;
+} catch { /* build-data.json not generated yet */ }
+
+const homeHero = buildData.pages?.home?.hero || {};
+const homeSolutionsBar = buildData.pages?.home?.solutions_bar || {};
+const homeCta = buildData.pages?.home?.cta || {};
+
+const SOLUTIONS = [
+  { href: homeSolutionsBar.item_1_url || '/solutions/data-centers', title: homeSolutionsBar.item_1_title || 'Data Centers', desc: homeSolutionsBar.item_1_desc || 'Uninterruptible power for mission-critical IT infrastructure' },
+  { href: homeSolutionsBar.item_2_url || '/solutions/healthcare', title: homeSolutionsBar.item_2_title || 'Healthcare', desc: homeSolutionsBar.item_2_desc || 'Reliable backup power for medical equipment and facilities' },
+  { href: homeSolutionsBar.item_3_url || '/solutions/industrial', title: homeSolutionsBar.item_3_title || 'Industrial', desc: homeSolutionsBar.item_3_desc || 'Rugged power solutions for manufacturing and automation' },
+];
+---
+
+<BaseLayout buildData={buildData}>
+  <section class="hero-section" style="padding: var(--spacing-24) 0; text-align: center;">
+    <div class="container">
+      <h1 class="hero-title" style="font-size: var(--font-size-5xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-tight); letter-spacing: var(--letter-spacing-tight); max-width: 56rem; margin: 0 auto var(--spacing-6);">{homeHero.title || 'Uninterruptible Power for Your Business'}</h1>
+      <p class="hero-subtitle" style="font-size: var(--font-size-xl); line-height: var(--line-height-relaxed); max-width: 42rem; margin: 0 auto var(--spacing-8); color: var(--color-text-secondary);">{homeHero.subtitle || 'Enterprise-grade UPS systems, power distribution, and energy solutions tailored to your industry.'}</p>
+      <div class="hero-cta" style="display: flex; gap: var(--spacing-4); justify-content: center; flex-wrap: wrap;">
+        <a href="/products" class="btn-primary">{homeHero.cta_primary_text || 'Explore Products'}</a>
+        <a href={homeHero.cta_secondary_url || '/solutions/data-centers'} class="btn-secondary">{homeHero.cta_secondary_text || 'View Solutions'}</a>
+      </div>
+    </div>
+  </section>
+  <section class="solutions-section" style="padding: var(--spacing-20) 0;">
+    <div class="container">
+      <h2 class="section-title" style="font-size: var(--font-size-3xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-snug); margin-bottom: var(--spacing-8);">{homeSolutionsBar.title || 'Industry Solutions'}</h2>
+      <div class="solutions-grid" style="display: grid; gap: var(--spacing-6); grid-template-columns: repeat(3, 1fr);">
+        {SOLUTIONS.map((s) => (
+          <a href={s.href} class="card" style="text-decoration: none; display: block; padding: var(--spacing-8);">
+            <h3 class="heading-3" style="margin-bottom: var(--spacing-3);">{s.title}</h3>
+            <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm); line-height: var(--line-height-relaxed);">{s.desc}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+  <section class="cta-section" style="padding: var(--spacing-20) 0; background: var(--color-surface-subtle);">
+    <div class="container" style="text-align: center;">
+      <h2 class="section-title" style="font-size: var(--font-size-3xl); font-weight: var(--font-weight-semibold); line-height: var(--line-height-snug); margin-bottom: var(--spacing-4);">{homeCta.title || 'Need a Custom Power Solution?'}</h2>
+      <p class="cta-description" style="font-size: var(--font-size-lg); color: var(--color-text-secondary); margin-bottom: var(--spacing-8); max-width: 36rem; margin-left: auto; margin-right: auto;">{homeCta.description || 'Our engineers can design a system tailored to your exact requirements.'}</p>
+      <a href="/about#contact" class="btn-primary">{homeCta.cta_text || 'Request a Quote'}</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: var(--font-size-3xl) !important;
+    }
+    .hero-subtitle {
+      font-size: var(--font-size-lg) !important;
+    }
+    .solutions-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+</style>

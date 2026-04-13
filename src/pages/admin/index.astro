@@ -1,0 +1,45 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro'
+import { getDBFromEnv } from '../../lib/db'
+import { getEnv } from '../../lib/env'
+import { products, newsPosts, quoteRequests, comments } from '../../lib/db/schema'
+import { eq, sql } from 'drizzle-orm'
+
+export const prerender = false;
+
+let stats = { quotes: 0, news: 0, products: 0, comments: 0 };
+
+try {
+  const env = await getEnv();
+  const db = getDBFromEnv(env);
+  if (db) {
+    const [quotes, news, prods, comms] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(quoteRequests),
+      db.select({ count: sql<number>`count(*)` }).from(newsPosts).where(eq(newsPosts.status, 'published')),
+      db.select({ count: sql<number>`count(*)` }).from(products),
+      db.select({ count: sql<number>`count(*)` }).from(comments).where(eq(comments.status, 'pending')),
+    ]);
+    stats.quotes = quotes[0]?.count ?? 0;
+    stats.news = news[0]?.count ?? 0;
+    stats.products = prods[0]?.count ?? 0;
+    stats.comments = comms[0]?.count ?? 0;
+  }
+} catch { /* D1 not available */ }
+---
+
+<AdminLayout title="Dashboard — Admin" currentPath="/admin">
+  <div>
+    <h1 class="heading-1" style="margin-bottom: 1.5rem;">Dashboard</h1>
+    <div style="display: grid; gap: 1.5rem; grid-template-columns: repeat(4, 1fr);">
+      <div class="card"><p class="stat-label">New Quotes</p><p class="stat-value" style="color: var(--color-info-text);">{stats.quotes}</p></div>
+      <div class="card"><p class="stat-label">Published News</p><p class="stat-value" style="color: var(--color-success-text);">{stats.news}</p></div>
+      <div class="card"><p class="stat-label">Products</p><p class="stat-value" style="color: var(--color-stat-purple);">{stats.products}</p></div>
+      <div class="card"><p class="stat-label">Pending Comments</p><p class="stat-value" style="color: var(--color-stat-amber);">{stats.comments}</p></div>
+    </div>
+  </div>
+</AdminLayout>
+
+<style>
+  .stat-label { font-size: 0.75rem; color: var(--color-text-tertiary); }
+  .stat-value { margin-top: 0.5rem; font-size: 1.875rem; font-weight: 600; }
+</style>
