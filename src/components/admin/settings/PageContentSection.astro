@@ -295,7 +295,12 @@ async function saveAllPageContent(btn: HTMLButtonElement) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as Record<string, unknown>).error instanceof Error ? (data.error as Error).message : typeof (data as Record<string, unknown>).error === 'string' ? (data as Record<string, unknown>).error as string : '' || `Failed to save ${page} content`);
+        const errorMessage = (data as Record<string, unknown>).error instanceof Error 
+          ? (data.error as Error).message 
+          : typeof (data as Record<string, unknown>).error === 'string' 
+          ? (data as Record<string, unknown>).error as string 
+          : `Failed to save ${page} content`;
+        throw new Error(errorMessage);
       }
     } catch (e) {
       hasError = true;
@@ -322,5 +327,5 @@ async function saveAllPageContent(btn: HTMLButtonElement) {
   }
 }
 
-(window as any).saveAllPageContent // eslint-disable-line @typescript-eslint/no-explicit-any = saveAllPageContent;
+(window as any).saveAllPageContent = saveAllPageContent;
 </script>

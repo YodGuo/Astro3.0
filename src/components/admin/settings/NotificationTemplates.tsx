@@ -72,27 +72,7 @@ export default function NotificationTemplates() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
-
-  // Sync state when templatesCache loads (e.g., after save/reset)
-  useEffect(() => {
-    onTemplateEventChange();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- templatesCache is a reactive dependency read inside onTemplateEventChange
-  }, [templatesCache]);
-
-  function onTemplateEventChange() {
-    const tpl = templatesCache.find((t: { eventType: string; subject: string; body: string; title: string; text: string; variables: string[] }) => t.eventType === currentEventType);
-    setEmailSubject(tpl?.subject || '');
-    setEmailBody(tpl?.body || '');
-    setWebhookTitle(tpl?.title || '');
-    setWebhookText(tpl?.text || '');
-    setVariables(tpl?.variables || []);
-    updatePreview(tpl?.subject || '', tpl?.body || '', tpl?.title || '', tpl?.text || '');
-  }
-
-  function updatePreview(subject: string, body: string, title: string, text: string) {
+  const updatePreview = useCallback((subject: string, body: string, title: string, text: string) => {
     const sampleData = TEMPLATE_SAMPLE_DATA[currentEventType] || {};
     const custom = subject || body || title || text;
     setHasCustom(!!custom);
@@ -116,7 +96,26 @@ export default function NotificationTemplates() {
       html += `<div><strong>Webhook Text:</strong><div style="margin-top:0.375rem;padding:0.75rem;background:white;border-radius:6px;border:1px solid var(--color-border);white-space:pre-wrap;">${escHtml(renderTemplatePreview(text, sampleData))}</div></div>`;
     }
     setPreviewHtml(html);
-  }
+  }, [currentEventType]);
+
+  const onTemplateEventChange = useCallback(() => {
+    const tpl = templatesCache.find((t: { eventType: string; subject: string; body: string; title: string; text: string; variables: string[] }) => t.eventType === currentEventType);
+    setEmailSubject(tpl?.subject || '');
+    setEmailBody(tpl?.body || '');
+    setWebhookTitle(tpl?.title || '');
+    setWebhookText(tpl?.text || '');
+    setVariables(tpl?.variables || []);
+    updatePreview(tpl?.subject || '', tpl?.body || '', tpl?.title || '', tpl?.text || '');
+  }, [templatesCache, currentEventType, updatePreview]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  // Sync state when templatesCache loads (e.g., after save/reset)
+  useEffect(() => {
+    onTemplateEventChange();
+  }, [onTemplateEventChange]);
 
   function onTemplateInput() {
     updatePreview(emailSubject, emailBody, webhookTitle, webhookText);

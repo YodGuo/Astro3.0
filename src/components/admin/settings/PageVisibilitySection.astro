@@ -52,5 +52,5 @@ function toggleSetting(checkbox: HTMLInputElement) {
     });
   } catch { alert('Network error'); checkbox.checked = !value; }
 }
-(window as any).toggleSetting // eslint-disable-line @typescript-eslint/no-explicit-any = toggleSetting;
+(window as any).toggleSetting = toggleSetting;
 </script>

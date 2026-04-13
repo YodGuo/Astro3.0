@@ -155,7 +155,12 @@ async function saveThemeSettings(btn: HTMLButtonElement) {
       if (!res.ok) {
         hasError = true;
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as Record<string, unknown>).error instanceof Error ? (data.error as Error).message : typeof (data as Record<string, unknown>).error === 'string' ? (data as Record<string, unknown>).error as string : '' || `Failed to save ${field.key}`);
+        const errorMessage = (data as Record<string, unknown>).error instanceof Error 
+          ? (data.error as Error).message 
+          : typeof (data as Record<string, unknown>).error === 'string' 
+          ? (data as Record<string, unknown>).error as string 
+          : `Failed to save ${field.key}`;
+        throw new Error(errorMessage);
       }
     } catch (e) {
       hasError = true;
@@ -182,5 +187,5 @@ async function saveThemeSettings(btn: HTMLButtonElement) {
   }
 }
 
-(window as any).saveThemeSettings // eslint-disable-line @typescript-eslint/no-explicit-any = saveThemeSettings;
+(window as any).saveThemeSettings = saveThemeSettings;
 </script>

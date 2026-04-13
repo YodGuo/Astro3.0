@@ -98,7 +98,7 @@ async function saveDomainSettings(btn: HTMLButtonElement) {
     if (!input) continue;
 
     // Normalize: strip protocol and trailing slash
-    let value = input.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const value = input.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
     input.value = value;
 
     try {
@@ -110,7 +110,12 @@ async function saveDomainSettings(btn: HTMLButtonElement) {
       if (!res.ok) {
         hasError = true;
         const data = await res.json().catch(() => ({}));
-        throw new Error((data as Record<string, unknown>).error instanceof Error ? (data.error as Error).message : typeof (data as Record<string, unknown>).error === 'string' ? (data as Record<string, unknown>).error as string : '' || `Failed to save ${field.key}`);
+        const errorMessage = (data as Record<string, unknown>).error instanceof Error 
+          ? (data.error as Error).message 
+          : typeof (data as Record<string, unknown>).error === 'string' 
+          ? (data as Record<string, unknown>).error as string 
+          : `Failed to save ${field.key}`;
+        throw new Error(errorMessage);
       }
     } catch (e) {
       hasError = true;
@@ -166,5 +171,5 @@ async function saveDomainSettings(btn: HTMLButtonElement) {
   }
 }
 
-(window as any).saveDomainSettings // eslint-disable-line @typescript-eslint/no-explicit-any = saveDomainSettings;
+(window as any).saveDomainSettings = saveDomainSettings;
 </script>

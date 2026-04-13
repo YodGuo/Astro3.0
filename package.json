@@ -50,8 +50,10 @@
     "@astrojs/check": "^0.9.8",
     "@cloudflare/workers-types": "^4.20260410.1",
     "@eslint/js": "^10.0.1",
+    "@opentelemetry/api": "^1.9.1",
     "eslint": "^10.2.0",
     "eslint-plugin-astro": "^1.7.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.1",
     "vitest": "^4.1.4"
