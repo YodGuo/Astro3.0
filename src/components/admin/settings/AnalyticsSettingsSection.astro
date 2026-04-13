@@ -81,10 +81,9 @@ async function saveAnalyticsSettings(btn: HTMLButtonElement) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      const errorMessage = (data as Record<string, unknown>).error instanceof Error 
-        ? (data.error as Error).message 
-        : typeof (data as Record<string, unknown>).error === 'string' 
-        ? (data as Record<string, unknown>).error as string 
+      const error = (data as Record<string, unknown>).error;
+      const errorMessage = typeof error === 'string' 
+        ? error 
         : 'Failed to save analytics settings';
       throw new Error(errorMessage);
     }

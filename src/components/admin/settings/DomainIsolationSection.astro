@@ -110,10 +110,9 @@ async function saveDomainSettings(btn: HTMLButtonElement) {
       if (!res.ok) {
         hasError = true;
         const data = await res.json().catch(() => ({}));
-        const errorMessage = (data as Record<string, unknown>).error instanceof Error 
-          ? (data.error as Error).message 
-          : typeof (data as Record<string, unknown>).error === 'string' 
-          ? (data as Record<string, unknown>).error as string 
+        const error = (data as Record<string, unknown>).error;
+        const errorMessage = typeof error === 'string' 
+          ? error 
           : `Failed to save ${field.key}`;
         throw new Error(errorMessage);
       }
