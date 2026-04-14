@@ -1,0 +1,192 @@
+{
+  "name": "astro3",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ── Default vars (local dev / wrangler dev) ──────
+  "vars": {
+    "BETTER_AUTH_URL": "http://localhost:4321",
+    "ADMIN_EMAIL": "admin@yourcompany.com",
+    "EMAIL_FROM": "B2B Website <onboarding@resend.dev>"
+  },
+  // Secrets (set per-environment via `npx wrangler secret put <NAME>`):
+  //   RESEND_API_KEY       — Resend API key for sending emails
+  //   BETTER_AUTH_SECRET   — Auth secret (min 32 chars, generate with `npx auth secret`)
+
+  "assets": {
+    "directory": "./dist/assets"
+  },
+
+  // ── D1 Database ─────────────────────────────────
+  // Top-level config is used for local dev.
+  // Production and staging must have their own database IDs.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-b2b-db",
+      "database_id": "placeholder-local-dev",
+      "migrations_dir": "./migrations"
+    }
+  ],
+
+  // ── R2 Bucket ───────────────────────────────────
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "my-b2b-assets"
+    }
+  ],
+
+  // ── KV Namespaces ───────────────────────────────
+  "kv_namespaces": [
+    {
+      "binding": "SESSION",
+      "id": "placeholder-local-dev"
+    },
+    {
+      "binding": "SETTINGS_CACHE",
+      "id": "placeholder-settings-cache"
+    }
+  ],
+
+  // ── Cloudflare Images ───────────────────────────
+  "images": {
+    "binding": "IMAGES"
+  },
+
+  // ── Queues ──────────────────────────────────────
+  "queues": {
+    "producers": [
+      {
+        "binding": "NOTIFICATION_QUEUE",
+        "queue": "notification-queue"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "notification-queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "notification-queue-dlq"
+      }
+    ]
+  },
+
+  // ── Environment Overrides ───────────────────────
+  // Each environment has its own D1, KV, R2, and Queue resources.
+  // Before deploying, replace placeholder IDs with actual resource IDs:
+  //   npx wrangler d1 create my-b2b-db-staging   → copy database_id
+  //   npx wrangler d1 create my-b2b-db-production → copy database_id
+  //   npx wrangler kv namespace create SESSION-staging        → copy id
+  //   npx wrangler kv namespace create SETTINGS_CACHE-staging → copy id
+  //   npx wrangler r2 bucket create my-b2b-assets-staging     → bucket_name
+  //   npx wrangler queues create notification-queue-staging   → queue name
+  // Then set secrets per environment:
+  //   npx wrangler secret put BETTER_AUTH_SECRET --env staging
+  //   npx wrangler secret put RESEND_API_KEY --env staging
+  //   npx wrangler secret put BETTER_AUTH_SECRET --env production
+  //   npx wrangler secret put RESEND_API_KEY --env production
+
+  "env": {
+    "staging": {
+      "name": "my-b2b-site-astro-staging",
+      "vars": {
+        "BETTER_AUTH_URL": "https://staging.yourcompany.com",
+        "ADMIN_EMAIL": "admin@yourcompany.com",
+        "EMAIL_FROM": "B2B Staging <staging@resend.dev>"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "my-b2b-db-staging",
+          "database_id": "REPLACE_WITH_STAGING_D1_ID",
+          "migrations_dir": "./migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "my-b2b-assets-staging"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "SESSION",
+          "id": "REPLACE_WITH_STAGING_SESSION_KV_ID"
+        },
+        {
+          "binding": "SETTINGS_CACHE",
+          "id": "REPLACE_WITH_STAGING_SETTINGS_KV_ID"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "NOTIFICATION_QUEUE",
+            "queue": "notification-queue-staging"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "notification-queue-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "notification-queue-staging-dlq"
+          }
+        ]
+      }
+    },
+
+    "production": {
+      "name": "my-b2b-site-astro-production",
+      "vars": {
+        "BETTER_AUTH_URL": "https://yourcompany.com",
+        "ADMIN_EMAIL": "admin@yourcompany.com",
+        "EMAIL_FROM": "B2B Website <onboarding@resend.dev>"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "my-b2b-db-production",
+          "database_id": "REPLACE_WITH_PRODUCTION_D1_ID",
+          "migrations_dir": "./migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "my-b2b-assets-production"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "SESSION",
+          "id": "REPLACE_WITH_PRODUCTION_SESSION_KV_ID"
+        },
+        {
+          "binding": "SETTINGS_CACHE",
+          "id": "REPLACE_WITH_PRODUCTION_SETTINGS_KV_ID"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "NOTIFICATION_QUEUE",
+            "queue": "notification-queue-production"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "notification-queue-production",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "notification-queue-production-dlq"
+          }
+        ]
+      }
+    }
+  }
+}

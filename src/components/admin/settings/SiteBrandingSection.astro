@@ -1,0 +1,152 @@
+---
+/**
+ * SiteBrandingSection — Admin UI for managing site name, logo, favicon, and OG image.
+ * Reads current values from props (passed from parent page via D1 query).
+ * Saves via PUT /api/settings (UPSERT + KV cache invalidation).
+ */
+
+interface Props {
+  settings: Record<string, string>;
+}
+
+const { settings } = Astro.props;
+
+const siteName = settings.site_name || '';
+const siteDescription = settings.site_description || '';
+const siteLogoUrl = settings.site_logo_url || '';
+const siteFaviconUrl = settings.site_favicon_url || '';
+const siteOgImageUrl = settings.site_og_image_url || '';
+---
+
+<div style="margin-bottom: 2rem;">
+  <h2 style="font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary); margin-bottom: 0.75rem;">Site Branding</h2>
+  <div class="card" style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+    <!-- Site Name -->
+    <div>
+      <label for="brand-site-name" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Site Name</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">Displayed in the header, footer, page titles, and search results.</p>
+      <input id="brand-site-name" type="text" value={siteName} maxlength="100" placeholder="YourCompany"
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box;" />
+    </div>
+
+    <!-- Site Description -->
+    <div>
+      <label for="brand-site-desc" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Site Description</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">Default meta description for pages without a custom description.</p>
+      <textarea id="brand-site-desc" rows="2" maxlength="300" placeholder="Professional B2B power solutions..."
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box; resize: vertical;">{siteDescription}</textarea>
+    </div>
+
+    <!-- Logo URL -->
+    <div>
+      <label for="brand-logo-url" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Logo URL</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">Image displayed in the header. Leave empty to show the site name as text.</p>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input id="brand-logo-url" type="text" value={siteLogoUrl} placeholder="/media/logo.png"
+          style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box;" />
+        {siteLogoUrl && <img src={siteLogoUrl} alt="Logo preview" style="height: 2rem; width: auto; border-radius: var(--radius-sm); border: 1px solid var(--color-border);" />}
+      </div>
+    </div>
+
+    <!-- Favicon URL -->
+    <div>
+      <label for="brand-favicon-url" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Favicon URL</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">Browser tab icon. Supports SVG, ICO, and PNG formats.</p>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input id="brand-favicon-url" type="text" value={siteFaviconUrl} placeholder="/favicon.svg"
+          style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box;" />
+        {siteFaviconUrl && <img src={siteFaviconUrl} alt="Favicon preview" style="height: 1.5rem; width: auto; border-radius: var(--radius-sm); border: 1px solid var(--color-border);" />}
+      </div>
+    </div>
+
+    <!-- OG Default Image URL -->
+    <div>
+      <label for="brand-og-image-url" style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Default OG Image URL</label>
+      <p style="font-size: 0.8125rem; color: var(--color-text-tertiary); margin-bottom: 0.375rem;">Fallback image for social sharing (Open Graph). Leave empty to use /og-default.png.</p>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <input id="brand-og-image-url" type="text" value={siteOgImageUrl} placeholder="/media/og-default.png"
+          style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.875rem; box-sizing: border-box;" />
+        {siteOgImageUrl && <img src={siteOgImageUrl} alt="OG preview" style="height: 2rem; width: auto; border-radius: var(--radius-sm); border: 1px solid var(--color-border);" />}
+      </div>
+    </div>
+
+    <!-- Save Button -->
+    <div style="display: flex; justify-content: flex-end; padding-top: 0.5rem; border-top: 1px solid var(--color-border);">
+      <button id="brand-save-btn" type="button" class="btn-secondary" onclick="saveBrandingSettings(this)">
+        Save Branding
+      </button>
+    </div>
+
+    <!-- Status message -->
+    <div id="brand-status" style="font-size: 0.8125rem; display: none;"></div>
+
+  </div>
+</div>
+
+<script>
+const BRANDING_FIELDS = [
+  { id: 'brand-site-name', key: 'site_name' },
+  { id: 'brand-site-desc', key: 'site_description' },
+  { id: 'brand-logo-url', key: 'site_logo_url' },
+  { id: 'brand-favicon-url', key: 'site_favicon_url' },
+  { id: 'brand-og-image-url', key: 'site_og_image_url' },
+];
+
+async function saveBrandingSettings(btn: HTMLButtonElement) {
+  const statusEl = document.getElementById('brand-status');
+  const originalText = btn.textContent;
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  if (statusEl) { statusEl.style.display = 'none'; }
+
+  let hasError = false;
+
+  for (const field of BRANDING_FIELDS) {
+    const input = document.getElementById(field.id) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (!input) continue;
+
+    const value = input.value.trim();
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: field.key, value }),
+      });
+      if (!res.ok) {
+        hasError = true;
+        const data = await res.json().catch(() => ({}));
+        const error = (data as Record<string, unknown>).error;
+        const errorMessage = typeof error === 'string' 
+          ? error 
+          : `Failed to save ${field.key}`;
+        throw new Error(errorMessage);
+      }
+    } catch (e) {
+      hasError = true;
+      if (statusEl) {
+        statusEl.textContent = `Error: ${(e as Error).message}`;
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--color-danger)';
+      }
+      break;
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = hasError ? 'Retry' : 'Saved ✓';
+
+  if (!hasError && statusEl) {
+    statusEl.textContent = 'Branding settings saved. Changes will appear on all pages after cache refresh (up to 5 minutes).';
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--color-brand-800)';
+  }
+
+  if (!hasError) {
+    setTimeout(() => { btn.textContent = originalText || 'Save Branding'; }, 2000);
+  }
+}
+
+(window as any).saveBrandingSettings = saveBrandingSettings;
+</script>

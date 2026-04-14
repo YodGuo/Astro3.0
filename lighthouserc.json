@@ -1,0 +1,19 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 1,
+      "startServerCommand": "npm run preview",
+      "startServerReadyPattern": "Local server",
+      "url": [
+        "http://localhost:4321/",
+        "http://localhost:4321/products"
+      ]
+    },
+    "assert": {
+      "preset": "lighthouse:recommended"
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

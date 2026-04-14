@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import LoginForm from '../components/LoginForm.tsx'
+import ErrorBoundary from '../components/ErrorBoundary.tsx'
+
+export const prerender = false;
+---
+
+<BaseLayout title="Sign In">
+  <section style="padding: 4rem 0;">
+    <div class="container">
+      <ErrorBoundary client:load>
+        <LoginForm client:load />
+      </ErrorBoundary>
+    </div>
+  </section>
+</BaseLayout>
